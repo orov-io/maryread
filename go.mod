@@ -1,4 +1,4 @@
-module github.com/orov-io/echo-middleware
+module github.com/orov-io/maryRead
 
 go 1.19
 
