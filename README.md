@@ -1,7 +1,11 @@
-# echo-middleware
-Custom middleware fucntions to echo web router
-
+# Mary Read
+Provides a [echo router](https://echo.labstack.com/) wrapper with extra functionality like database initialization and util working middleware to be
+shared between microservices.
+Also helps to [fight global warming](https://en.wikipedia.org/wiki/Flying_Spaghetti_Monster#Pirates_and_global_warming) acting as [Mary Read](https://en.wikipedia.org/wiki/Mary_Read)
 # Available Middleware
+```
+    import "github.com/orov-io/maryRead/middleware"
+```
 ## Body Dump
 
 Adds the default Bodydump echo middleware for request with the header *X-Bodydump* not empty.
