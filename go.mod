@@ -1,4 +1,4 @@
-module github.com/orov-io/maryRead
+module github.com/orov-io/maryread
 
 go 1.19
 

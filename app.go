@@ -3,7 +3,7 @@ package maryread
 import (
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
-	"github.com/orov-io/maryRead/middleware"
+	"github.com/orov-io/maryread/middleware"
 	"github.com/rs/zerolog"
 )
 
