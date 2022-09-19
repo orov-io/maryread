@@ -11,11 +11,13 @@ func DefaultRequestZeroLoggerConfig() echo.MiddlewareFunc {
 		LogStatus:  true,
 		LogLatency: true,
 		LogHost:    true,
+		LogMethod:  true,
 		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
 			logger := GetLogger(c)
 			logger.Info().
 				Str("host", v.Host).
 				Str("URI", v.URI).
+				Str("method", v.Method).
 				Int("status", v.Status).
 				Str("latency", v.Latency.String()).
 				Msg("request")

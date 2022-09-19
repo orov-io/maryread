@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ type defaultRequestLoggerResponse struct {
 	URI       string `json:"URI"`
 	Status    int
 	Latency   string
+	Method    string
 }
 
 const requestLoggerTestPath = "/test"
@@ -42,14 +44,17 @@ func TestDefaultRequestZeroLoggerConfig(t *testing.T) {
 
 	e.ServeHTTP(rec, req)
 
+	data := buffer.Bytes()
+	t.Logf("Tha data %+v", string(data))
 	var log defaultRequestLoggerResponse
-	json.Unmarshal(buffer.Bytes(), &log)
+	json.Unmarshal(data, &log)
 
 	assert.Equal(t, "info", log.Level)
 	assert.Empty(t, log.RequestID)
 	assert.Equal(t, requestLoggerTestHost, log.Host)
 	assert.Equal(t, requestLoggerTestMsg, log.Message)
 	assert.Equal(t, requestLoggerTestPath, log.URI)
+	assert.Equal(t, strings.ToLower(http.MethodGet), strings.ToLower(log.Method))
 	assert.Equal(t, http.StatusOK, log.Status)
 	assert.NotEmpty(t, log.Latency)
 	responseTime, err := time.Parse(time.RFC3339, log.Time)
