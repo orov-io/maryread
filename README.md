@@ -7,7 +7,11 @@ Also helps to [fight global warming](https://en.wikipedia.org/wiki/Flying_Spaghe
 # App
 ## Default
 Provides an app with default tools:
-- A new echo router
+- A new echo router.
+- The [RequestID echo middleware](https://echo.labstack.com/middleware/request-id/).
+- A zero logger in the echo context.
+- Prints requests logs.
+- [Body Dump](https://echo.labstack.com/middleware/body-dump/) on header X-Bodydump not empty.
 Usage:
 ```
     import "github.com/orov-io/maryread
