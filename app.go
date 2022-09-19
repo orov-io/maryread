@@ -1,6 +1,11 @@
 package maryread
 
-import "github.com/labstack/echo/v4"
+import (
+	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/orov-io/maryRead/middleware"
+	"github.com/rs/zerolog"
+)
 
 type App struct {
 	router *echo.Echo
@@ -16,8 +21,17 @@ func New(options AppOptions) *App {
 // Returns a new app with default values.
 func Default() *App {
 	return &App{
-		router: echo.New(),
+		router: getEchoWithDefaultMiddleware(),
 	}
+}
+
+func getEchoWithDefaultMiddleware() *echo.Echo {
+	e := echo.New()
+	e.Use(echoMiddleware.RequestID())
+	e.Use(middleware.DefaultLogger(zerolog.DebugLevel))
+	e.Use(middleware.DefaultRequestZeroLoggerConfig())
+	e.Use(middleware.BodyDumpOnHeader())
+	return e
 }
 
 // AppOptions models the app tools.
