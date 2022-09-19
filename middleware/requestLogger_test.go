@@ -45,7 +45,6 @@ func TestDefaultRequestZeroLoggerConfig(t *testing.T) {
 	e.ServeHTTP(rec, req)
 
 	data := buffer.Bytes()
-	t.Logf("Tha data %+v", string(data))
 	var log defaultRequestLoggerResponse
 	json.Unmarshal(data, &log)
 
