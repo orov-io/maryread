@@ -1,11 +1,19 @@
 package maryread
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/labstack/echo/v4"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
+
+const testDefaultMiddlewarePath = "/test"
+
+var testDefaultMiddlewareslogger zerolog.Logger
+var testDefaultMiddlewaresRequestID string
 
 func TestNewApp(t *testing.T) {
 	options := AppOptions{}
@@ -22,6 +30,14 @@ func TestNewAppWithCustomRouter(t *testing.T) {
 	assert.Equal(t, router, app.router)
 }
 
+func TestRouter(t *testing.T) {
+	router := echo.New()
+	options := AppOptions{Router: RouterOptions{Router: router}}
+	app := New(options)
+	assert.Equal(t, router, app.Router())
+
+}
+
 func TestDefault(t *testing.T) {
 	app := Default()
 	assert.NotEmpty(t, app)
@@ -29,10 +45,28 @@ func TestDefault(t *testing.T) {
 	assert.IsType(t, echo.New(), app.router)
 }
 
-func TestRouter(t *testing.T) {
-	router := echo.New()
-	options := AppOptions{Router: RouterOptions{Router: router}}
-	app := New(options)
-	assert.Equal(t, router, app.Router())
+func TestDefaultMiddlewares(t *testing.T) {
+	app := Default()
+	app.Router().GET(testDefaultMiddlewarePath, getTestDefaultMiddlewaresHandler(t))
 
+	req := httptest.NewRequest(http.MethodGet, testDefaultMiddlewarePath, nil)
+	rec := httptest.NewRecorder()
+
+	app.Router().ServeHTTP(rec, req)
+
+	// Logger
+	assert.NotEmpty(t, testDefaultMiddlewareslogger)
+	assert.NotNil(t, testDefaultMiddlewareslogger)
+	assert.IsType(t, zerolog.Logger{}, testDefaultMiddlewareslogger)
+
+	// RequestID
+	assert.NotEmpty(t, testDefaultMiddlewaresRequestID)
+}
+
+func getTestDefaultMiddlewaresHandler(t *testing.T) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		testDefaultMiddlewareslogger = GetLogger(c)
+		testDefaultMiddlewaresRequestID = RequestID(c)
+		return c.String(http.StatusOK, "test")
+	}
 }

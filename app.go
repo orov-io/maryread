@@ -57,3 +57,13 @@ func routerFromOptions(options AppOptions) *echo.Echo {
 
 	return echo.New()
 }
+
+// GetLogger is a shortcut to middleware.GetLogger()
+func GetLogger(c echo.Context) zerolog.Logger {
+	return middleware.GetLogger(c)
+}
+
+// RequestID is a shortcut to middleware.RequestID()
+func RequestID(c echo.Context) string {
+	return middleware.RequestID(c)
+}
