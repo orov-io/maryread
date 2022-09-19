@@ -2,6 +2,40 @@
 Provides a [echo router](https://echo.labstack.com/) wrapper with extra functionality like database initialization and util working middleware to be
 shared between microservices.
 Also helps to [fight global warming](https://en.wikipedia.org/wiki/Flying_Spaghetti_Monster#Pirates_and_global_warming) acting as [Mary Read](https://en.wikipedia.org/wiki/Mary_Read)
+
+# App
+## Default
+Provides an app with default tools:
+- A new echo router
+Usage:
+```
+    import "github.com/orov-io/maryRead
+    // ...
+
+    app := maryread.Default()
+    // You can access to the new echo router by app.Router()
+    // app.Router().Use()
+    // app.Router().GET()...
+    
+```
+
+## Custom App
+Returns an app with tools configured via options:
+Usage:
+```
+    import "github.com/orov-io/maryRead
+    // ...
+
+    e := echo.New()
+    // e.GET()....
+    options := maryread.AppOptions{
+        Router: RouterOptions{
+            Router: router
+        }
+    }
+    
+```
+
 # Available Middleware
 ```
     import "github.com/orov-io/maryRead/middleware"
