@@ -91,3 +91,8 @@ e.Use(DefaultLogger(zerolog.DebugLevel))
 e.Use(DefaultRequestZeroLoggerConfig())
 ```
 It relies in the provided logger functionality, like the body dump middleware. Use the zerologger and the echo requestLogger middleware to log request info.
+
+## TODO list
+
+[] Migrate current middleware to fit the echo provided middleware (a default initializer and an initializer with options... perhaps other initializer with default config overrides by env vars...)
+[] Decouple auth middleware from firebase.
