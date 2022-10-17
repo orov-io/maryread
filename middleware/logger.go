@@ -6,12 +6,12 @@ import (
 
 	jwt "github.com/golang-jwt/jwt"
 
+	"firebase.google.com/go/auth"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
 )
 
 const loggerContextField = "zeroLogger"
-const userContextField = "user"
 const userIDAnnonymousValue = "annonymous"
 const userIDLoggerContextualTag = "userID"
 const idClaimKey = "ID"
@@ -39,9 +39,12 @@ func injectLogger(logger zerolog.Logger) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 
 			var userID string
-			switch user := c.Get(userContextField).(type) {
+			switch idToken := c.Get(userContextField).(type) {
 			case *jwt.Token:
-				userID = user.Claims.(jwt.MapClaims)[idClaimKey].(string)
+				userID = idToken.Claims.(jwt.MapClaims)[idClaimKey].(string)
+
+			case *auth.Token:
+				userID = idToken.UID
 
 			default:
 				userID = userIDAnnonymousValue
