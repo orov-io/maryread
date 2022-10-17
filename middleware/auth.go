@@ -37,6 +37,7 @@ func NewAuthMiddleware(ctx context.Context) *AuthMiddleware {
 func (a *AuthMiddleware) AllowAnonymous() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
+			_, _ = a.login(c)
 			return next(c)
 		}
 	}
