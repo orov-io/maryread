@@ -1,6 +1,7 @@
 package maryread
 
 import (
+	"firebase.google.com/go/auth"
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/orov-io/maryread/middleware"
@@ -66,4 +67,9 @@ func GetLogger(c echo.Context) zerolog.Logger {
 // RequestID is a shortcut to middleware.RequestID()
 func RequestID(c echo.Context) string {
 	return middleware.RequestID(c)
+}
+
+// GetIDToken is a shortcut to middleware.GetIDToken()
+func GetIDToken(c echo.Context) *auth.Token {
+	return middleware.GetIDToken(c)
 }
