@@ -70,6 +70,6 @@ func RequestID(c echo.Context) string {
 }
 
 // GetIDToken is a shortcut to middleware.GetIDToken()
-func GetIDToken(c echo.Context) *auth.Token {
+func GetIDToken(c echo.Context) (*auth.Token, error) {
 	return middleware.GetIDToken(c)
 }
