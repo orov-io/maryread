@@ -73,3 +73,13 @@ func RequestID(c echo.Context) string {
 func GetIDToken(c echo.Context) (*auth.Token, error) {
 	return middleware.GetIDToken(c)
 }
+
+// LoggedUserIs is a shortcut to middleware.LoggedUserIs()
+func LoggedUserIs(c echo.Context, rol string) bool {
+	return middleware.LoggedUserIs(c, rol)
+}
+
+// LoggedUserIsAny is a shortcut to middleware.LoggedUserIsAny()
+func LoggedUserIsAny(c echo.Context, roles []string) bool {
+	return middleware.LoggedUserIsAny(c, roles)
+}
