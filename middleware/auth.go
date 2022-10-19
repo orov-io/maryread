@@ -11,7 +11,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const bearerPrefix = "bearer "
+const bearerPrefix = "Bearer "
 
 var app *firebase.App
 var client *auth.Client
@@ -26,7 +26,7 @@ type AuthClient interface {
 	VerifyIDToken(ctx context.Context, idToken string) (*auth.Token, error)
 }
 
-// DefaultAuthMiddleware return a auth middleware with a firebase auth client initialized from env vars.
+// DefaultAuthMiddleware returns the auth middleware with a firebase auth client initialized from env vars.
 func DefaultAuthMiddleware() *AuthMiddleware {
 	if !firebaseInitilized {
 		initFirebase()
@@ -34,6 +34,7 @@ func DefaultAuthMiddleware() *AuthMiddleware {
 	return NewAuthMiddleware(context.Background(), client)
 }
 
+// NewAuthMiddleware return a new auth middleware with the desired authClient attached.
 func NewAuthMiddleware(ctx context.Context, authClient AuthClient) *AuthMiddleware {
 	return &AuthMiddleware{
 		authClient: authClient,
@@ -54,7 +55,7 @@ func (a *AuthMiddleware) AllowAnonymous() echo.MiddlewareFunc {
 
 // LoggedUsers searchs for a valid JWT and logs in the founded user. If no JWT is found,
 // it returns a 401 unauthorized standar error, stopping the request.
-func (a *AuthMiddleware) LoggedUsers() echo.MiddlewareFunc {
+func (a *AuthMiddleware) LoggedUser() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			_, err := a.login(c)

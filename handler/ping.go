@@ -9,7 +9,7 @@ import (
 type Ping struct {
 }
 
-const pingPath = "/ping"
+const PingPath = "/ping"
 const pongResponse = "pong"
 
 func NewPingHandler() *Ping {
@@ -21,5 +21,5 @@ func (v *Ping) GetPingHandler(c echo.Context) error {
 }
 
 func (v *Ping) AddHandlers(e *echo.Echo) {
-	e.GET(pingPath, v.GetPingHandler)
+	e.GET(PingPath, v.GetPingHandler)
 }

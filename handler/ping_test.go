@@ -18,7 +18,7 @@ func TestNewPing(t *testing.T) {
 func TestGetPingHandler(t *testing.T) {
 	e := getEchoRouterWithPingHandlers()
 
-	req := httptest.NewRequest(http.MethodGet, pingPath, nil)
+	req := httptest.NewRequest(http.MethodGet, PingPath, nil)
 	rec := httptest.NewRecorder()
 
 	e.ServeHTTP(rec, req)

@@ -1,3 +1,3 @@
 package middleware
 
-const userContextField = "idToken"
+const userContextField = "jwt"

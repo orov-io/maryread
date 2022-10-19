@@ -1,0 +1,5 @@
+package middleware
+
+const testJWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJRCI6IjEyMzQ1Njc4OTAiLCJuYW1lIjoiVHJ1bWFuIENhcG90ZSIsInJvbGVzIjpbImFkbWluIl0sImV4cCI6MjI2MzEzNDQxM30.K_xzBV5s1omrF_7tzXaD0dvdhzUQGFd2VRVR7VmrjWE"
+const testEmptyJWT = ""
+const testJWTHeaderPrefix = "Bearer"

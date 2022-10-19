@@ -19,10 +19,8 @@ import (
 const loggerTestPath = "/test"
 const loggerTestMsg = "test"
 
-const testJWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJJRCI6IjEyMzQ1Njc4OTAiLCJuYW1lIjoiVHJ1bWFuIENhcG90ZSIsInJvbGVzIjpbImFkbWluIl0sImV4cCI6MjI2MzEzNDQxM30.K_xzBV5s1omrF_7tzXaD0dvdhzUQGFd2VRVR7VmrjWE"
 const expectedTestJWTID = "1234567890"
 const testJWTSecret = "TrumanCapote"
-const testJWTHeaderPrefix = "Bearer"
 
 type defaultLoggerResponse struct {
 	Level     string
@@ -67,6 +65,7 @@ func TestDefaultLoggerWithJWT(t *testing.T) {
 	e := echo.New()
 	e.Use(middleware.JWTWithConfig(middleware.JWTConfig{
 		SigningKey: []byte(testJWTSecret),
+		ContextKey: userContextField,
 	}))
 	e.Use(DefaultLogger(zerolog.DebugLevel))
 
@@ -85,8 +84,6 @@ func TestDefaultLoggerWithJWT(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unable to parse body: %v", err)
 	}
-
-	t.Logf("tha raw body: %+v", string(data))
 
 	var log defaultLoggerResponse
 	json.Unmarshal(data, &log)
@@ -113,8 +110,6 @@ func TestDefaultLoggerChangingLevel(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unable to parse body: %v", err)
 	}
-
-	t.Logf("tha raw body: %+v", string(data))
 
 	var log defaultLoggerResponse
 	json.Unmarshal(data, &log)
