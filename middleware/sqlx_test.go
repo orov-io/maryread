@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -8,18 +9,20 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/labstack/echo/v4"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	sqlxTestPath             = "/sqlxPath"
-	sqlxTestHost             = "localhost"
-	sqlxTestPort             = "5453"
-	sqlxTestUser             = "truman"
-	sqlxTestPassword         = "capote"
-	sqlxTestDBName           = "trumanCapote"
-	sqlxTestSSLMode          = "disable"
-	sqlxTestExpectedPSQLInfo = "host=localhost port=5453 user=truman password=capote dbname=trumanCapote sslmode=disable"
+	sqlxTestPath                        = "/sqlxPath"
+	sqlxTestHost                        = "localhost"
+	sqlxTestPort                        = "5453"
+	sqlxTestUser                        = "truman"
+	sqlxTestPassword                    = "capote"
+	sqlxTestDBName                      = "trumanCapote"
+	sqlxTestSSLMode                     = "disable"
+	sqlxTestExpectedPSQLInfo            = "host=localhost port=5453 user=truman password=capote dbname=trumanCapote sslmode=disable"
+	sqlxTestAbsoluteMigrationPathEnvKey = "SQLX_MIGRATION_PATH"
 )
 
 func TestSQLXWithConfigWithDBAndDriver(t *testing.T) {
@@ -53,6 +56,46 @@ func TestSQLXWithConfigNoDataSource(t *testing.T) {
 	config := SQLXConfig{
 		Driver: "someDriver",
 	}
+	assert.Panics(t, func() {
+		_, _, _ = sqlxTestGetRouterAndRequestWithMiddleareAndTestHandlerClosingBody(config)
+	})
+}
+
+func TestSQLXAutomigrateNoPath(t *testing.T) {
+	db, _, _ := sqlmock.New()
+	config := SQLXConfig{
+		DB:          db,
+		Driver:      defaultSQLDriver,
+		AutoMigrate: true,
+	}
+
+	assert.Panics(t, func() {
+		_, _, _ = sqlxTestGetRouterAndRequestWithMiddleareAndTestHandlerClosingBody(config)
+	})
+
+}
+
+func TestSQLXAutomigrateSuccess(t *testing.T) {
+	config := SQLXConfig{
+		Driver:         "sqlite3",
+		DataSourceName: ":memory:",
+		AutoMigrate:    true,
+		MigrationPath:  fmt.Sprintf("%s/success", os.Getenv(sqlxTestAbsoluteMigrationPathEnvKey)),
+	}
+
+	assert.NotPanics(t, func() {
+		_, _, _ = sqlxTestGetRouterAndRequestWithMiddleareAndTestHandlerClosingBody(config)
+	})
+}
+
+func TestSQLXAutomigrateFail(t *testing.T) {
+	config := SQLXConfig{
+		Driver:         "sqlite3",
+		DataSourceName: ":memory:",
+		AutoMigrate:    true,
+		MigrationPath:  fmt.Sprintf("%s/fail", os.Getenv(sqlxTestAbsoluteMigrationPathEnvKey)),
+	}
+
 	assert.Panics(t, func() {
 		_, _, _ = sqlxTestGetRouterAndRequestWithMiddleareAndTestHandlerClosingBody(config)
 	})
@@ -121,7 +164,8 @@ func sqlxTestGetRouterAndRequestWithMiddleareAndTestHandlerClosingBody(config SQ
 ) {
 
 	e := echo.New()
-	e.Use(SQLXWithConfig(config))
+	m := NewSQLX()
+	e.Use(m.WithConfig(config))
 	e.GET(sqlxTestPath, sqlxTestHandler)
 	req := httptest.NewRequest(http.MethodGet, sqlxTestPath, nil)
 	rec := httptest.NewRecorder()

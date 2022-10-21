@@ -11,27 +11,47 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	em "github.com/labstack/echo/v4/middleware"
+	goose "github.com/pressly/goose/v3"
 )
 
-type SQLXConfig struct {
-	// Skipper defines a function to skip middleware.
-	Skipper em.Skipper
+type (
+	SQLXConfig struct {
+		// Skipper defines a function to skip middleware.
+		Skipper em.Skipper
 
-	// BeforeFunc defines a function which is executed just before the middleware.
-	BeforeFunc em.BeforeFunc
+		// BeforeFunc defines a function which is executed just before the middleware.
+		BeforeFunc em.BeforeFunc
 
-	// DB is the inner db to be used. If is not provided, a new db will be open based either
-	// in the Driver and DataSourceName attribute or in the default env vars.
-	DB *sql.DB
+		// DB is the inner db to be used. If is not provided, a new db will be open based either
+		// in the Driver and DataSourceName attribute or in the default env vars.
+		DB *sql.DB
 
-	// Driver defines the driver to be used when a new database is tried to be opened.
-	// If DB is provided, the middleware will never tried to stablish this connection.
-	Driver string
+		// Driver defines the driver to be used when a new database is tried to be opened.
+		// If DB is provided, the middleware will never tried to stablish this connection.
+		Driver string
 
-	// DataSorceName is used in conjuntion with the Driver attribute when a new database is tried to be opened.
-	// If DB is provided, the middleware will never tried to stablish this connection.
-	DataSourceName string
-}
+		// DataSorceName is used in conjuntion with the Driver attribute when a new database is tried to be opened.
+		// If DB is provided, the middleware will never tried to stablish this connection.
+		DataSourceName string
+
+		// AutoMigrate defines if migrations will apply on middleware initialization. If true,
+		// you must provide a MigrationPath folder with the migrations files.
+		// pressly/goose (https://github.com/pressly/goose) is used to execute the migrations.
+		// The default SQLX middleware set this attribute to true
+		AutoMigrate bool
+
+		// MigrationPath defines the path to migrations files. Is used on middleware initialization
+		// If AutoMigrate is set to true. Also used in calls to SQLXApplyMigrations.
+		// pressly/goose (https://github.com/pressly/goose) is used to execute the migrations.
+		// The default SQLX middleware set this attribute to ./migration
+		MigrationPath string
+	}
+	SQLX struct {
+		config      SQLXConfig
+		dbx         *sqlx.DB
+		initialized bool
+	}
+)
 
 const (
 	defaultSQLDriver = "postgres"
@@ -39,36 +59,48 @@ const (
 )
 
 var (
-	sqlxInnerInstance *sqlx.DB
-	sqlxIsInitialized bool
 	DefaultSQLXConfig = SQLXConfig{
 		Skipper:        em.DefaultSkipper,
 		DB:             nil,
 		Driver:         "",
 		DataSourceName: "",
+		AutoMigrate:    false,
+		MigrationPath:  "",
 	}
 )
 
-func SQLX() echo.MiddlewareFunc {
+func NewSQLX() *SQLX {
+	return &SQLX{
+		config:      SQLXConfig{},
+		dbx:         nil,
+		initialized: false,
+	}
+}
+
+func (m *SQLX) Default() echo.MiddlewareFunc {
 	config := DefaultSQLXConfig
 	config.Driver = defaultSQLDriver
 	config.DataSourceName = generatePSQLInfo()
-	return SQLXWithConfig(config)
+	config.AutoMigrate = true
+	config.MigrationPath = "./migration"
+	return m.WithConfig(config)
 }
 
-func SQLXWithConfig(config SQLXConfig) echo.MiddlewareFunc {
-	config = mixSQLXConfigDefault(config)
-	sqlxInnerInstance = initDB(config)
-	sqlxIsInitialized = true
-	return sqlxHandlerFunc(config)
+func (m *SQLX) WithConfig(config SQLXConfig) echo.MiddlewareFunc {
+	m.config = config
+	m.mixSQLXConfigDefault()
+	m.dbx = m.initDB()
+	m.initialized = true
+	m.autoApplyMigrations()
+	return m.sqlxHandlerFunc()
 }
 
-func initDB(config SQLXConfig) *sqlx.DB {
-	if sqlxIsInitialized {
+func (m *SQLX) initDB() *sqlx.DB {
+	if m.initialized {
 		panic("SQLX middleware already initialized!")
 	}
 
-	dbx, err := mustOpenDB(config)
+	dbx, err := m.mustOpenDB()
 	if err != nil {
 		panic(fmt.Sprintf("Unable to connect to database with provided config due to error %v", err))
 	}
@@ -76,16 +108,16 @@ func initDB(config SQLXConfig) *sqlx.DB {
 	return dbx
 }
 
-func mustOpenDB(config SQLXConfig) (*sqlx.DB, error) {
+func (m *SQLX) mustOpenDB() (*sqlx.DB, error) {
 	ret := retrier.New(retrier.ExponentialBackoff(5, 1*time.Second), retrier.DefaultClassifier{})
 
 	var dbx *sqlx.DB
 	err := ret.Run(
 		func() error {
-			if config.DB != nil {
-				dbx = sqlx.NewDb(config.DB, config.Driver)
+			if m.config.DB != nil {
+				dbx = sqlx.NewDb(m.config.DB, m.config.Driver)
 			} else {
-				dbx = sqlx.MustOpen(config.Driver, config.DataSourceName)
+				dbx = sqlx.MustOpen(m.config.Driver, m.config.DataSourceName)
 			}
 
 			return dbx.Ping()
@@ -94,46 +126,70 @@ func mustOpenDB(config SQLXConfig) (*sqlx.DB, error) {
 	return dbx, err
 }
 
-func sqlxHandlerFunc(config SQLXConfig) echo.MiddlewareFunc {
+func (m *SQLX) autoApplyMigrations() {
+	if !m.config.AutoMigrate {
+		return
+	}
+
+	goose.SetDialect(m.dbx.DriverName())
+	err := m.applyMigration(m.config.MigrationPath)
+	if err != nil {
+		panic(fmt.Sprintf("Unable to apply SQLX migrations due to error: %v", err))
+	}
+}
+
+func (m *SQLX) applyMigration(migrationPath string) error {
+	return goose.Up(m.dbx.DB, migrationPath)
+}
+
+func (m *SQLX) sqlxHandlerFunc() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if config.Skipper(c) {
+			if m.config.Skipper(c) {
 				return next(c)
 			}
 
-			if config.BeforeFunc != nil {
-				config.BeforeFunc(c)
+			if m.config.BeforeFunc != nil {
+				m.config.BeforeFunc(c)
 			}
 
-			c.Set(sqlxDBContextKey, sqlxInnerInstance)
+			c.Set(sqlxDBContextKey, m.dbx)
 			return next(c)
 		}
 	}
 }
 
-func mixSQLXConfigDefault(config SQLXConfig) SQLXConfig {
-	if config.Skipper == nil {
-		config.Skipper = DefaultSQLXConfig.Skipper
+func (m *SQLX) mixSQLXConfigDefault() {
+	if m.config.Skipper == nil {
+		m.config.Skipper = DefaultSQLXConfig.Skipper
 	}
 
-	if config.DB != nil {
-		if config.Driver == "" {
-			panic("To use a existing sql.DB database you must provide the driver to be used in the Driver attribute.")
-		}
-		return config
+	if m.config.DB != nil {
+		m.panicNoDriver()
+	} else {
+		m.adjustDriverAndDataSourceConfigOrPanic()
 	}
 
-	//
-	if (config.Driver == "" || config.Driver == defaultSQLDriver) && config.DataSourceName == "" {
-		config.Driver = defaultSQLDriver
-		config.DataSourceName = generatePSQLInfo()
+	if m.config.AutoMigrate && m.config.MigrationPath == "" {
+		panic("To enable SQLX automigrations you must specify the migrations path in config.MigrationPath")
+	}
+}
+
+func (m *SQLX) panicNoDriver() {
+	if m.config.Driver == "" {
+		panic("To use a existing sql.DB database you must provide the driver to be used in the Driver attribute.")
+	}
+}
+
+func (m *SQLX) adjustDriverAndDataSourceConfigOrPanic() {
+	if (m.config.Driver == "" || m.config.Driver == defaultSQLDriver) && m.config.DataSourceName == "" {
+		m.config.Driver = defaultSQLDriver
+		m.config.DataSourceName = generatePSQLInfo()
 	}
 
-	if config.DataSourceName == "" {
+	if m.config.DataSourceName == "" {
 		panic("Please, specify either the pair DataSourceConnection and Driver or suply a valid DB.")
 	}
-
-	return config
 }
 
 func generatePSQLInfo() string {
