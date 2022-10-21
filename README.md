@@ -118,3 +118,4 @@ It relies in the provided logger functionality, like the body dump middleware. U
 [] Decouple auth middleware from firebase. Use the echo middleware with custom (parse) functions.
 [] Use the echo.NewHTTPError to return errors that echo will understand, so return c.JSON(...) will not be used and code become clearest.
 [] Add auth and sqlx middleware to readme.
+[] Add Must\<shortcut> to app, in order to panic if can obtain required object, as in dbx.

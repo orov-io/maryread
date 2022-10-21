@@ -2,6 +2,7 @@ package maryread
 
 import (
 	"firebase.google.com/go/auth"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/orov-io/maryread/middleware"
@@ -82,4 +83,18 @@ func LoggedUserIs(c echo.Context, rol string) bool {
 // LoggedUserIsAny is a shortcut to middleware.LoggedUserIsAny()
 func LoggedUserIsAny(c echo.Context, roles []string) bool {
 	return middleware.LoggedUserIsAny(c, roles)
+}
+
+// GetDBX is a shortcut to middleware.GetDBX()
+func GetDBX(c echo.Context) (*sqlx.DB, error) {
+	return middleware.GetDBX(c)
+}
+
+// MustGetDBX is like GetDBX but panics on error
+func MustGetDBX(c echo.Context) *sqlx.DB {
+	dbx, err := GetDBX(c)
+	if err != nil {
+		panic(err)
+	}
+	return dbx
 }
