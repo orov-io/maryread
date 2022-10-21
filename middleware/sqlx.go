@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/eapache/go-resiliency/retrier"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	em "github.com/labstack/echo/v4/middleware"
@@ -66,19 +68,30 @@ func initDB(config SQLXConfig) *sqlx.DB {
 		panic("SQLX middleware already initialized!")
 	}
 
-	var dbx *sqlx.DB
-	if config.DB != nil {
-		dbx = sqlx.NewDb(config.DB, config.Driver)
-	} else {
-		dbx = sqlx.MustOpen(config.Driver, config.DataSourceName)
-	}
-
-	err := dbx.Ping()
+	dbx, err := mustOpenDB(config)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to connect to database with provided config due to error %v", err))
 	}
 
 	return dbx
+}
+
+func mustOpenDB(config SQLXConfig) (*sqlx.DB, error) {
+	ret := retrier.New(retrier.ExponentialBackoff(5, 1*time.Second), retrier.DefaultClassifier{})
+
+	var dbx *sqlx.DB
+	err := ret.Run(
+		func() error {
+			if config.DB != nil {
+				dbx = sqlx.NewDb(config.DB, config.Driver)
+			} else {
+				dbx = sqlx.MustOpen(config.Driver, config.DataSourceName)
+			}
+
+			return dbx.Ping()
+		})
+
+	return dbx, err
 }
 
 func sqlxHandlerFunc(config SQLXConfig) echo.MiddlewareFunc {
