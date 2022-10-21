@@ -84,7 +84,7 @@ func initDB(config SQLXConfig) *sqlx.DB {
 func sqlxHandlerFunc(config SQLXConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			if config.Skipper != nil {
+			if config.Skipper(c) {
 				return next(c)
 			}
 
@@ -124,10 +124,10 @@ func mixSQLXConfigDefault(config SQLXConfig) SQLXConfig {
 }
 
 func generatePSQLInfo() string {
-	host, port, user, password, dbname := parseSQLXEnvVars()
+	host, port, user, password, dbname, sslMode := parseSQLXEnvVars()
 	return fmt.Sprintf("host=%s port=%s user=%s "+
-		"password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
+		"password=%s dbname=%s sslmode=%s",
+		host, port, user, password, dbname, sslMode)
 }
 
 const (
@@ -136,9 +136,10 @@ const (
 	sqlxUserEnvKey     = "POSTGRES_USER"
 	sqlxPasswordEnvKey = "POSTGRES_PASSWORD"
 	sqlxDBNameEnvKey   = "POSTGRES_DBNAME"
+	sqlxSSLModeEnvKey  = "POSTGRES_SSLMODE"
 )
 
-func parseSQLXEnvVars() (host, port, user, password, dbName string) {
+func parseSQLXEnvVars() (host, port, user, password, dbName, sslMode string) {
 	var ok bool
 	host, ok = os.LookupEnv(sqlxHostEnvKey)
 	if !ok {
@@ -165,6 +166,11 @@ func parseSQLXEnvVars() (host, port, user, password, dbName string) {
 		panicBySQLXEnv(sqlxDBNameEnvKey)
 	}
 
+	sslMode, ok = os.LookupEnv(sqlxSSLModeEnvKey)
+	if !ok {
+		panicBySQLXEnv(sqlxSSLModeEnvKey)
+	}
+
 	return
 }
 
@@ -175,13 +181,10 @@ func panicBySQLXEnv(key string) {
 var ErrDBXMissing = echo.NewHTTPError(http.StatusInternalServerError, "unable to obtain the dbx in context. Please, initiate the sqlx middleware first")
 
 func GetDBX(c echo.Context) (*sqlx.DB, error) {
-	switch dbx := c.Get(sqlxDBContextKey).(type) {
-	case *sqlx.DB:
-		if dbx == nil {
-			return dbx, ErrDBXMissing
-		}
-		return dbx, nil
+	dbx, ok := c.Get(sqlxDBContextKey).(*sqlx.DB)
+	if !ok || dbx == nil {
+		return dbx, ErrDBXMissing
 	}
-	return nil, ErrDBXMissing
+	return dbx, nil
 
 }
