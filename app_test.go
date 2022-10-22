@@ -24,10 +24,12 @@ func TestNewApp(t *testing.T) {
 
 func TestNewAppWithCustomRouter(t *testing.T) {
 	router := echo.New()
-	options := AppOptions{Router: RouterOptions{Router: router}}
+	options := AppOptions{Router: RouterOptions{Router: router, Validator: NewValidatorRawError()}}
 	app := New(options)
 	assert.NotEmpty(t, app)
 	assert.Equal(t, router, app.router)
+	assert.NotNil(t, app.Router().Validator)
+	assert.IsType(t, &ValidatorRawError{}, app.Router().Validator)
 }
 
 func TestRouter(t *testing.T) {
@@ -35,7 +37,7 @@ func TestRouter(t *testing.T) {
 	options := AppOptions{Router: RouterOptions{Router: router}}
 	app := New(options)
 	assert.Equal(t, router, app.Router())
-
+	assert.Nil(t, app.Router().Validator)
 }
 
 func TestDefault(t *testing.T) {
@@ -43,6 +45,8 @@ func TestDefault(t *testing.T) {
 	assert.NotEmpty(t, app)
 	assert.NotNil(t, app.router)
 	assert.IsType(t, echo.New(), app.router)
+	assert.NotNil(t, app.Router().Validator)
+	assert.IsType(t, &Validator{}, app.Router().Validator)
 }
 
 func TestDefaultMiddlewares(t *testing.T) {

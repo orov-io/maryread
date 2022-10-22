@@ -13,6 +13,18 @@ type App struct {
 	router *echo.Echo
 }
 
+// AppOptions models the app tools.
+type AppOptions struct {
+	Router RouterOptions
+}
+
+// RouterOptions model the echo router options. If provided, app will use the
+// expecified echo router.
+type RouterOptions struct {
+	Router    *echo.Echo
+	Validator echo.Validator
+}
+
 // NewApp generates a new app with tools expecified in provided options.
 func New(options AppOptions) *App {
 	return &App{
@@ -33,18 +45,8 @@ func getEchoWithDefaultMiddleware() *echo.Echo {
 	e.Use(middleware.DefaultLogger(zerolog.DebugLevel))
 	e.Use(middleware.DefaultRequestZeroLoggerConfig())
 	e.Use(middleware.BodyDumpOnHeader())
+	e.Validator = NewValidator()
 	return e
-}
-
-// AppOptions models the app tools.
-type AppOptions struct {
-	Router RouterOptions
-}
-
-// RouterOptions model the echo router options. If provided, app will use the
-// expecified echo router.
-type RouterOptions struct {
-	Router *echo.Echo
 }
 
 // Router returns the inner echo router.
@@ -53,11 +55,18 @@ func (app *App) Router() *echo.Echo {
 }
 
 func routerFromOptions(options AppOptions) *echo.Echo {
+	var e *echo.Echo
 	if options.Router.Router != nil {
-		return options.Router.Router
+		e = options.Router.Router
+	} else {
+		e = echo.New()
 	}
 
-	return echo.New()
+	if options.Router.Validator != nil {
+		e.Validator = options.Router.Validator
+	}
+
+	return e
 }
 
 // GetLogger is a shortcut to middleware.GetLogger()
