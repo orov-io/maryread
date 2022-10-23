@@ -1,6 +1,8 @@
 package maryread
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/labstack/echo/v4"
@@ -18,6 +20,10 @@ const (
 	testValidatorValidEmail   = "truman@capote.com"
 	testValidatorEmptyEmail   = ""
 	testValidatorInvalidEmail = "truman"
+
+	testValidatorhandlerPath       = "/validator"
+	testValidatorRequestValidURI   = "/validator?id=1"
+	testValidatorRequestInvalidURI = "/validator?id=truman"
 )
 
 var (
@@ -86,4 +92,36 @@ func TestCustomValidatorRawError(t *testing.T) {
 
 	err = validator.Validate(testValidatorValidUser)
 	assert.NoError(t, err)
+}
+
+func TestBindlidate_ValidQuery(t *testing.T) {
+	e := echo.New()
+	e.Validator = NewValidator()
+
+	req := httptest.NewRequest(http.MethodGet, testValidatorRequestValidURI, nil)
+	rec := httptest.NewRecorder()
+
+	c := e.NewContext(req, rec)
+	query := new(testValidatorQueryRequest)
+	err := Bindlidate(c, query)
+
+	assert.NoError(t, err)
+}
+
+func TestBindlidate_InvalidQuery(t *testing.T) {
+	e := echo.New()
+	e.Validator = NewValidator()
+
+	req := httptest.NewRequest(http.MethodGet, testValidatorRequestInvalidURI, nil)
+	rec := httptest.NewRecorder()
+
+	c := e.NewContext(req, rec)
+	query := new(testValidatorQueryRequest)
+	err := Bindlidate(c, query)
+
+	assert.Error(t, err)
+}
+
+type testValidatorQueryRequest struct {
+	Id int `query:"id" validate:"required,number"`
 }

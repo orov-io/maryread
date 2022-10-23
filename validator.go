@@ -42,3 +42,14 @@ func NewValidatorRawError() *ValidatorRawError {
 func (v *ValidatorRawError) Validate(i interface{}) error {
 	return v.validator.Struct(i)
 }
+
+// Bindlidate uses provided context to both Bind and Validate data.
+func Bindlidate[T any](c echo.Context, data *T) error {
+	err := c.Bind(data)
+	if err != nil {
+		return err
+	}
+
+	err = c.Validate(data)
+	return err
+}
