@@ -43,7 +43,9 @@ func getEchoWithDefaultMiddleware() *echo.Echo {
 	e := echo.New()
 	e.Use(echoMiddleware.RequestID())
 	e.Use(middleware.DefaultLogger(zerolog.DebugLevel))
-	e.Use(middleware.DefaultRequestZeroLoggerConfig())
+	// See https://github.com/labstack/echo/issues/2310 to come back to custom request logger
+	// e.Use(middleware.DefaultRequestZeroLoggerConfig())
+	e.Use(echoMiddleware.Logger())
 	e.Use(middleware.BodyDumpOnHeader())
 	e.Validator = NewValidator()
 	return e

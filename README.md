@@ -127,3 +127,4 @@ It relies in the provided logger functionality, like the body dump middleware. U
 [] Add Must\<shortcut> to app, in order to panic if can obtain required object, as in dbx.
 [] Add test to middleware shortcuts.
 [] WARNING: If you want´t to use the datadog/sqlmock db mock in your test, please, deactivate the automigration feature or use the in memory sqlite3 driver (see the automigration test). We couldn't infer the Execs and transactions that goose made to the database in an Up command, so it will panic with no acction expecteds.
+[] Check https://github.com/labstack/echo/issues/2310 to come back to use the custom request logger by default.
