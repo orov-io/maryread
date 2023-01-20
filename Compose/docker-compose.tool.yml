@@ -1,0 +1,50 @@
+version: '3'
+
+services:
+  phpmyadmin:
+    image: phpmyadmin
+    restart: always
+    container_name: phpmyadmin
+    environment:
+      - PMA_ARBITRARY=1
+      - APACHE_PORT=9001
+    ports:
+      - "9001:9001"
+    networks:
+      tool-tier:
+        ipv4_address: 175.25.0.4
+    logging:
+      driver: ${PHPMYADMIN_LOG_DRIVER:-none}
+    depends_on:
+      - mysql
+
+  mqttx:
+    image: emqx/mqttx-web
+    restart: always
+    container_name: mqttx-web
+    ports:
+      - "9002:80"
+    networks:
+      tool-tier:
+        ipv4_address: 175.25.0.5
+    logging:
+      driver: ${MQTTX_LOG_DRIVER:-none}
+    depends_on:
+      - mqtt
+    
+  kafka-ui:
+    container_name: kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 9003:8080
+    networks:
+      tool-tier:
+        ipv4_address: 175.25.0.7
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+    logging:
+      driver: ${KAFKAUI_LOG_DRIVER:-none}
+    depends_on:
+      - kafka

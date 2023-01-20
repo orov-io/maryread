@@ -102,15 +102,7 @@ Returns the generated requestID if you use the echo requestID middleware
 
 ### Request Logger
 
-Usage
-
-```go
-e := echo.New()
-e.Use(DefaultLogger(zerolog.DebugLevel))
-e.Use(DefaultRequestZeroLoggerConfig())
-```
-
-It relies in the provided logger functionality, like the body dump middleware. Use the zerologger and the echo requestLogger middleware to log request info.
+Deprecated. Use echo.middleware.Logger() Instead.
 
 ## TODO list
 
@@ -127,4 +119,4 @@ It relies in the provided logger functionality, like the body dump middleware. U
 [] Add Must\<shortcut> to app, in order to panic if can obtain required object, as in dbx.
 [] Add test to middleware shortcuts.
 [] WARNING: If you want´t to use the datadog/sqlmock db mock in your test, please, deactivate the automigration feature or use the in memory sqlite3 driver (see the automigration test). We couldn't infer the Execs and transactions that goose made to the database in an Up command, so it will panic with no acction expecteds.
-[] Check https://github.com/labstack/echo/issues/2310 to come back to use the custom request logger by default.
+[] Test if the default injected logger by the default echo logger middleware generates childs or insulate loggers in each context. If true, se the inner echo logger provided by the logger middleware instead of zero logger, accepting another logger that fit the error interface. Do this will result in delete the requestID Middleware. If not, check https://github.com/labstack/echo/issues/2310 to come back to use the custom request logger by default. Also, force the auth middleware to set a header in the request (X-LoggedUserID) and use the header string template mechanism in the logger to expose it. 

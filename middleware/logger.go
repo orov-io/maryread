@@ -1,93 +1,136 @@
 package middleware
 
 import (
-	"os"
-	"time"
+	"fmt"
+	"io"
+	"strconv"
 
-	jwt "github.com/golang-jwt/jwt"
-
-	"firebase.google.com/go/auth"
 	"github.com/labstack/echo/v4"
-	"github.com/rs/zerolog"
+	em "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/gommon/log"
 )
 
-const loggerContextField = "zeroLogger"
-const userIDAnnonymousValue = "annonymous"
-const userIDLoggerContextualTag = "userID"
-const idClaimKey = "ID"
-const logLevelHeader = "X-Loglevel"
+const (
+	logLevelHeader             = "X-Log-Level"
+	contextLoggerPanicHeader   = "[Context Logger]"
+	defaultContextLoggerHeader = `{"time":"${time_rfc3339_nano},"requestID":"${header:X-Request-ID}","level":"${level}","userID":"${header:X-Logged-User-Id}","prefix":"${prefix}","file":"${short_file}","line":"${line}"}"`
+)
 
-var defaultLevel = zerolog.DebugLevel
+type (
+	ContextLoggerConfig struct {
+		// Skipper defines a function to skip middleware.
+		Skipper em.Skipper
 
-// Logger will inject in context a default zerolog logger with all
-// available contextual info.
-// Default logger is a pretty logger with info level and timestamp functionality.
-func DefaultLogger(level zerolog.Level) echo.MiddlewareFunc {
-	defaultLevel = level
-	var logger = generateDefaultLogger()
+		// BeforeFunc defines a function which is executed just before the middleware.
+		BeforeFunc em.BeforeFunc
 
-	return injectLogger(logger)
+		// Logger defines the interface of the logger to inject to the context
+		Logger echo.Logger
+
+		// Level defines the log level. It uses the github.com/labstack/gommon/log levels.
+		// Let it empty to preserve the one sets in provided Logger.
+		Level uint8
+
+		// Output represent the output stream to write the log.
+		// Let it nil to preserve the one sets in provided Logger.
+		Output io.Writer
+
+		// Header defines the template to use to print logs. See github.com/labstack/gommon/log.
+		// Set it can cause lost the id attribute that logs the request ID.
+		// Let it empty to preserve the one sets in provided Logger.
+		Header string
+
+		// Header defines the prefix to print in logs, if defined in Header. See github.com/labstack/gommon/log.
+		// Defaults set to "context".
+		// Let it empty to preserve the one sets in provided Logger.
+		Prefix string
+	}
+)
+
+var ContextLoggerDefaultConfig = ContextLoggerConfig{
+	Skipper: em.DefaultSkipper,
+	Prefix:  "context",
 }
 
-func generateDefaultLogger() zerolog.Logger {
-	var output = zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
-	return zerolog.New(output).With().Timestamp().Logger().Level(defaultLevel)
+func ContextLogger(logger echo.Logger, level uint8) echo.MiddlewareFunc {
+	config := ContextLoggerDefaultConfig
+	config.Logger = logger
+	config.Level = level
+	config.Header = defaultContextLoggerHeader
+	return ContextLoggerWithConfig(config)
 }
 
-func injectLogger(logger zerolog.Logger) echo.MiddlewareFunc {
+func ContextLoggerWithConfig(config ContextLoggerConfig) echo.MiddlewareFunc {
+	mixContextLoggerDefaultConfig(&config)
+	mustSetLoggerLevel(config.Logger, config.Level)
+	if config.Output != nil {
+		config.Logger.SetOutput(config.Output)
+	}
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-
-			var userID string
-			switch idToken := c.Get(userContextField).(type) {
-			case *jwt.Token:
-				userID = idToken.Claims.(jwt.MapClaims)[idClaimKey].(string)
-
-			case *auth.Token:
-				userID = idToken.UID
-
-			default:
-				userID = userIDAnnonymousValue
-			}
-
-			child := logger.With().
-				Str("requestID", RequestID(c)).
-				Str(userIDLoggerContextualTag, userID)
-
-			SetLogger(c, child.Logger().Level(getLogLevel(c)))
+			c.SetLogger(log.New(config.Prefix))
+			c.Logger().SetOutput(config.Output)
+			setLoggerHeader(c, config)
+			c.Logger().SetLevel(getLogLevelFromContext(c, config.Level))
 
 			return next(c)
 		}
 	}
 }
 
-func getLogLevel(c echo.Context) zerolog.Level {
+func mixContextLoggerDefaultConfig(config *ContextLoggerConfig) {
+	if config.Logger == nil {
+		panic(fmt.Sprintf("%s Please, provide a not nil logger in config", contextLoggerPanicHeader))
+	}
+
+	if config.Skipper == nil {
+		config.Skipper = ContextLoggerDefaultConfig.Skipper
+	}
+
+	if config.Level == 0 {
+		config.Level = uint8(config.Logger.Level())
+	}
+
+	if config.Prefix == "" {
+		config.Prefix = config.Logger.Prefix()
+	}
+
+	if config.Output == nil {
+		config.Output = config.Logger.Output()
+	}
+}
+
+func setLoggerHeader(c echo.Context, config ContextLoggerConfig) {
+	if config.Header == "" {
+		return
+	}
+
+	c.Logger().SetHeader(config.Header)
+}
+
+func getLogLevelFromContext(c echo.Context, fallbackLevel uint8) log.Lvl {
 	logLevelHeader := c.Request().Header.Get(logLevelHeader)
 	if logLevelHeader == "" {
-		return defaultLevel
+		return log.Lvl(fallbackLevel)
 	}
 
-	level, err := zerolog.ParseLevel(logLevelHeader)
-	if err != nil {
-		return defaultLevel
+	u64, err := strconv.ParseUint(logLevelHeader, 10, 32)
+	if err != nil || u64 > 7 {
+		c.Logger().Errorf("Invalid log level in header %s. Please, provide a int between 1 and 7", logLevelHeader)
+		return c.Logger().Level()
 	}
 
-	return level
+	return log.Lvl(uint8(u64))
 }
 
-// GetLogger returns the contextual logger from context
-func GetLogger(c echo.Context) zerolog.Logger {
-	switch logger := c.Get(loggerContextField).(type) {
-	case zerolog.Logger:
-		return logger
-
-	default:
-		return generateDefaultLogger()
-	}
-
+func isValidLogLevel(level uint8) bool {
+	return level > 0 && level < 8
 }
 
-// SetLogger overrides the contextual logger in the echo context.
-func SetLogger(c echo.Context, logger zerolog.Logger) {
-	c.Set(loggerContextField, logger)
+func mustSetLoggerLevel(logger echo.Logger, level uint8) {
+	if !isValidLogLevel(level) {
+		panic(fmt.Sprintf("%s 0<LogLevel<8, %d provided", contextLoggerPanicHeader, level))
+	}
+
+	logger.SetLevel(log.Lvl(level))
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/labstack/echo/v4"
 	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/orov-io/maryread/middleware"
-	"github.com/rs/zerolog"
 )
 
 type App struct {
@@ -42,9 +41,6 @@ func Default() *App {
 func getEchoWithDefaultMiddleware() *echo.Echo {
 	e := echo.New()
 	e.Use(echoMiddleware.RequestID())
-	e.Use(middleware.DefaultLogger(zerolog.DebugLevel))
-	// See https://github.com/labstack/echo/issues/2310 to come back to custom request logger
-	// e.Use(middleware.DefaultRequestZeroLoggerConfig())
 	e.Use(echoMiddleware.Logger())
 	e.Use(middleware.BodyDumpOnHeader())
 	e.Validator = NewValidator()
@@ -69,11 +65,6 @@ func routerFromOptions(options AppOptions) *echo.Echo {
 	}
 
 	return e
-}
-
-// GetLogger is a shortcut to middleware.GetLogger()
-func GetLogger(c echo.Context) zerolog.Logger {
-	return middleware.GetLogger(c)
 }
 
 // RequestID is a shortcut to middleware.RequestID()

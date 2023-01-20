@@ -1,0 +1,160 @@
+
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+version: "2.2"
+
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    volumes:
+      - metadata_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=FoolishPassword
+      - POSTGRES_USER=druid
+      - POSTGRES_DB=druid
+    networks:
+      - app-tier
+    logging:
+      driver: ${POSTGRES_LOG_DRIVER:-none}
+
+  coordinator:
+    image: apache/druid:24.0.1
+    container_name: coordinator
+    volumes:
+      - druid_shared:/opt/shared
+      - coordinator_var:/opt/druid/var
+    depends_on: 
+      - zookeeper
+      - postgres
+    ports:
+      - "8081:8081"
+    command:
+      - coordinator
+    env_file:
+      - ../config/druid/environment
+      - ../config/druid/environment.override
+    networks:
+      - app-tier
+    logging:
+      driver: ${DRUID_COORDINATOR_LOG_DRIVER:-none}
+
+  broker:
+    image: apache/druid:24.0.1
+    container_name: broker
+    volumes:
+      - broker_var:/opt/druid/var
+    depends_on: 
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8082:8082"
+    command:
+      - broker
+    env_file:
+      - ../config/druid/environment
+      - ../config/druid/environment.override
+    networks:
+      - app-tier
+    logging:
+      driver: ${DRUID_BROKER_LOG_DRIVER:-none}
+
+  historical:
+    image: apache/druid:24.0.1
+    container_name: historical
+    volumes:
+      - druid_shared:/opt/shared
+      - historical_var:/opt/druid/var
+    depends_on: 
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8083:8083"
+    command:
+      - historical
+    env_file:
+      - ../config/druid/environment
+      - ../config/druid/environment.override
+    networks:
+      - app-tier
+    logging:
+      driver: ${DRUID_HISTORICAL_LOG_DRIVER:-none}
+
+  middlemanager:
+    image: apache/druid:24.0.1
+    container_name: middlemanager
+    volumes:
+      - druid_shared:/opt/shared
+      - middle_var:/opt/druid/var
+    depends_on: 
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8091:8091"
+      - "8100-8105:8100-8105"
+    command:
+      - middleManager
+    env_file:
+      - ../config/druid/environment
+      - ../config/druid/environment.override
+    networks:
+      - app-tier
+    logging:
+      driver: ${DRUID_MIDDLEMANAGER_LOG_DRIVER:-none}
+
+  router:
+    image: apache/druid:24.0.1
+    container_name: router
+    volumes:
+      - router_var:/opt/druid/var
+    depends_on:
+      - zookeeper
+      - postgres
+      - coordinator
+    ports:
+      - "8888:8888"
+    command:
+      - router
+    env_file:
+      - ../config/druid/environment
+      - ../config/druid/environment.override
+    networks:
+      - app-tier
+    logging:
+      driver: ${DRUID_ROUTER_LOG_DRIVER:-none}
+
+volumes:
+  metadata_data:
+    driver: local
+  middle_var: 
+    driver: local
+  historical_var: 
+    driver: local
+  broker_var: 
+    driver: local
+  coordinator_var: 
+    driver: local
+  router_var: 
+    driver: local
+  druid_shared: 
+    driver: local

@@ -1,0 +1,132 @@
+version: "3"
+services:
+  # PART I: Backend services
+  status:
+    image: vegenat/status
+    build:
+      context: ../service/status
+      dockerfile: Dockerfile
+      target: ${STATUS_SERVICE_MODE:-dev}
+      network: ${SERVICES_BUILD_NETWORK:-bridge}
+      args:
+        AZURE_PAT: cdy6vja5erdeavkf3euvozbb6o5rrt3lpqeguyaygv7nsaa4brta
+        GOPRIVATE: dev.azure.com
+    container_name: status
+    volumes:
+      - ../service/status:/app
+      - ../config/air/.air.debug.toml:/app/.air.debug.toml
+      - ../config/air/runHotDebugger.sh:/app/runHotDebugger.sh
+    ports:
+      - "1434:80"
+    environment:
+      DEBUGGER_PORT: 4000
+      DEBUGGER_EXPECTED_BUILD_TIME: ${STATUS_SERVICE_EXPECTED_BUILD_TIME:-30}
+    env_file:
+      - ../service/status/.env
+      - ../service/status/.override.env
+    restart: "no"
+    networks:
+      - app-tier
+    depends_on:
+      - mqtt
+      - mysql
+      - kafka
+
+  # PART II: Frontend clients
+
+  # PART III: 3erd party services
+  mqtt:
+    image: eclipse-mosquitto
+    restart: always
+    container_name: mqtt
+    volumes:
+      - ../config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto:/mosquitto/data
+    logging:
+      driver: ${MQTT_LOG_DRIVER:-none}
+    networks:
+      tool-tier:
+        ipv4_address: 175.25.0.2
+      app-tier:
+
+  mysql:
+    image: mysql:8
+    restart: always
+    container_name: mysql
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-vegenat}
+      MYSQL_USER: ${MYSQL_USER:-vegenat}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootPass}
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql:/var/lib/mysql
+    logging:
+      driver: ${MYSQL_LOG_DRIVER:-none}
+    networks:
+      tool-tier:
+        ipv4_address: 175.25.0.3
+      app-tier:
+
+  zookeeper:
+    image: 'bitnami/zookeeper:3.8'
+    restart: always
+    container_name: zookeeper
+    networks:
+      - app-tier
+    logging:
+      driver: ${ZOOKEEPER_LOG_DRIVER:-none}
+    volumes:
+      - zookeeper:/bitnami
+    environment:
+      ZOOKEEPER_TICK_TIME: 2000
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+      ZOO_MY_ID: 1
+    ports:
+      - 2181:2181
+
+  kafka:
+    image: 'bitnami/kafka:3.1'
+    restart: always
+    container_name: kafka
+    networks:
+      tool-tier:
+        ipv4_address: 175.25.0.6
+      app-tier:
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    volumes:
+      - kafka:/bitnami
+    logging:
+      driver: ${KAFKA_LOG_DRIVER:-none}
+
+
+volumes:
+  mysql:
+    driver: local
+  mosquitto:
+    driver: local
+  zookeeper:
+    driver: local
+  kafka:
+    driver: local
+  mongo:
+    driver: local
+
+networks:
+  app-tier:
+    driver: bridge
+  tool-tier:
+    external: true
+  

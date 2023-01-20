@@ -58,10 +58,7 @@ func TestDefaultMiddlewares(t *testing.T) {
 
 	app.Router().ServeHTTP(rec, req)
 
-	// Logger
-	assert.NotEmpty(t, testDefaultMiddlewareslogger)
-	assert.NotNil(t, testDefaultMiddlewareslogger)
-	assert.IsType(t, zerolog.Logger{}, testDefaultMiddlewareslogger)
+	// TODO: Test the logger.
 
 	// RequestID
 	assert.NotEmpty(t, testDefaultMiddlewaresRequestID)
@@ -69,7 +66,6 @@ func TestDefaultMiddlewares(t *testing.T) {
 
 func getTestDefaultMiddlewaresHandler(t *testing.T) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		testDefaultMiddlewareslogger = GetLogger(c)
 		testDefaultMiddlewaresRequestID = RequestID(c)
 		return c.String(http.StatusOK, "test")
 	}

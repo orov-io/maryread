@@ -12,7 +12,7 @@ import (
 )
 
 func initFirebase() {
-	if firebaseInitilized {
+	if firebaseInitialized {
 		return
 	}
 	var err error
@@ -64,6 +64,7 @@ func generateFirebaseCredential() []byte {
 	return []byte(credentialData)
 }
 
+const authUserIDHeader = "X-Logged-User-ID"
 const fbTypeEnvKey = "FB_TYPE"
 const fbProjectIDEnvKey = "FB_PROJECT_ID"
 const fbPrivateKeyIDEnvKey = "FB_PRIVATE_KEY_ID"
@@ -139,6 +140,11 @@ func setIDToken(c echo.Context, idToken *auth.Token) {
 	c.Set(userContextField, idToken)
 }
 
+func setUserIDHeader(c echo.Context, id string) {
+	c.Request().Header.Set(authUserIDHeader, id)
+	c.Response().Header().Set(authUserIDHeader, id)
+}
+
 // GetIDToken extract the token from the context field in userContextField and return it.
 // If no token is found, it returns a ErrNoIDTokenFound.
 func GetIDToken(c echo.Context) (*auth.Token, error) {
@@ -163,7 +169,7 @@ func LoggedUserIs(c echo.Context, rol string) bool {
 }
 
 // LoggedUserIsAny returns true if a idToken exists in the context and it have, at least, one
-// of the expecified roles.
+// of the specified roles.
 func LoggedUserIsAny(c echo.Context, roles []string) bool {
 	for _, rol := range roles {
 		if LoggedUserIs(c, rol) {
@@ -171,4 +177,13 @@ func LoggedUserIsAny(c echo.Context, roles []string) bool {
 		}
 	}
 	return false
+}
+
+func userIsAlreadyLogged(c echo.Context) bool {
+	_, err := GetIDToken(c)
+	userInContext := err == nil
+	userInRequestHeader := c.Request().Header.Get(authUserIDHeader) != ""
+	userInResponseHeader := c.Response().Header().Get(authUserIDHeader) != ""
+
+	return userInContext && userInRequestHeader && userInResponseHeader
 }

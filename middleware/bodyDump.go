@@ -2,20 +2,18 @@ package middleware
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
-const requestBodyKey = "requestBody"
-const responseBodyKey = "responseBody"
-const bodyDumpMessage = "Body Dump"
-const bodyDumpHeader = "X-Bodydump"
+const bodyDumpHeader = "X-Body-Dump"
 
 func BodyDumpOnHeader() echo.MiddlewareFunc {
 	return middleware.BodyDumpWithConfig(middleware.BodyDumpConfig{
 
-		Handler: bodyDumpHanler,
+		Handler: bodyDumpHandler,
 
 		Skipper: func(c echo.Context) bool {
 			header := c.Request().Header[bodyDumpHeader]
@@ -24,13 +22,18 @@ func BodyDumpOnHeader() echo.MiddlewareFunc {
 	})
 }
 
-func bodyDumpHanler(c echo.Context, reqBody, resBody []byte) {
-	logger := GetLogger(c)
+func bodyDumpHandler(c echo.Context, reqBody, resBody []byte) {
+	printBody(c, reqBody, "request")
+	printBody(c, resBody, "response")
+}
 
-	logger.Debug().
-		Str(requestBodyKey, cleanStringlifyBody(reqBody)).
-		Str(responseBodyKey, cleanStringlifyBody(resBody)).
-		Msg(bodyDumpMessage)
+func printBody(c echo.Context, body []byte, prefix string) {
+	oldPrefix := c.Logger().Prefix()
+
+	c.Logger().SetPrefix(fmt.Sprintf("%s/%s", bodyDumpHeader, prefix))
+	c.Logger().Printf(cleanStringlifyBody(body))
+
+	c.Logger().SetPrefix(oldPrefix)
 }
 
 func cleanStringlifyBody(body []byte) string {

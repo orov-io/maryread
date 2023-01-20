@@ -29,21 +29,21 @@ func TestNewAuthMiddleware(t *testing.T) {
 	assert.NotNil(t, authMiddleware)
 }
 
-func TestAllowAnnymousNoJWT(t *testing.T) {
+func TestAllowAnonymousNoJWT(t *testing.T) {
 	e := echo.New()
 	authMiddleware := authMiddlewareWithNoRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.AllowAnonymous())
 
-	res, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
 
-func TestAllowAnnymousWithJWT(t *testing.T) {
+func TestAllowAnonymousWithJWT(t *testing.T) {
 	e := echo.New()
 	authMiddleware := authMiddlewareWithRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.AllowAnonymous())
 
-	res, _, _ := performAuthPingTestRequest(e, testJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testJWT)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
 
@@ -52,7 +52,7 @@ func TestLoggedUserNoJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithNoRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.LoggedUser())
 
-	res, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 }
 
@@ -61,7 +61,7 @@ func TestLoggedUserWithJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.LoggedUser())
 
-	res, _, _ := performAuthPingTestRequest(e, testJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testJWT)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
 
@@ -70,7 +70,7 @@ func TestWithRoleNoJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithNoRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.WithRol(authTestTrueRol))
 
-	res, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 }
 
@@ -79,7 +79,7 @@ func TestWithRolBadRolWithJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.WithRol(authTestFalseRol))
 
-	res, _, _ := performAuthPingTestRequest(e, testJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testJWT)
 	assert.Equal(t, http.StatusForbidden, res.StatusCode)
 }
 
@@ -88,7 +88,7 @@ func TestWithRolGoodRolWithJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.WithRol(authTestTrueRol))
 
-	res, _, _ := performAuthPingTestRequest(e, testJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testJWT)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
 
@@ -97,7 +97,7 @@ func TestWithAnyNoJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithNoRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.WithAny([]string{authTestTrueRol, authTestFalseRol}))
 
-	res, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testEmptyJWT)
 	assert.Equal(t, http.StatusUnauthorized, res.StatusCode)
 }
 
@@ -106,7 +106,7 @@ func TestWithAnyBadRolWithJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.WithAny([]string{authTestFalseRol, authTestEmptyKeyRol}))
 
-	res, _, _ := performAuthPingTestRequest(e, testJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testJWT)
 	assert.Equal(t, http.StatusForbidden, res.StatusCode)
 }
 
@@ -115,12 +115,27 @@ func TestWithAnyGoodRolWithJWT(t *testing.T) {
 	authMiddleware := authMiddlewareWithRolesUserMockClient()
 	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.WithAny([]string{authTestTrueRol, authTestFalseRol}))
 
-	res, _, _ := performAuthPingTestRequest(e, testJWT)
+	res, _, _, _ := performAuthPingTestRequest(e, testJWT)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 }
 
-func performAuthPingTestRequest(e *echo.Echo, jwt string) (res *http.Response, data []byte, err error) {
-	req := httptest.NewRequest(http.MethodGet, handler.PingPath, nil)
+func TestUserIDHeaders(t *testing.T) {
+	e := echo.New()
+	authMiddleware := authMiddlewareWithRolesUserMockClient()
+	e.GET(handler.PingPath, handler.NewPingHandler().GetPingHandler, authMiddleware.LoggedUser())
+
+	res, req, _, _ := performAuthPingTestRequest(e, testJWT)
+	reqUserID := req.Header.Get(authUserIDHeader)
+	resUserID := res.Header.Get(authUserIDHeader)
+
+	assert.Equal(t, mockAuthClientUID, reqUserID)
+	assert.Equal(t, mockAuthClientUID, resUserID)
+}
+
+// TODO: Test that Parse as general middleware works fine with another middleware at request level.
+
+func performAuthPingTestRequest(e *echo.Echo, jwt string) (res *http.Response, req *http.Request, data []byte, err error) {
+	req = httptest.NewRequest(http.MethodGet, handler.PingPath, nil)
 	rec := httptest.NewRecorder()
 	if jwt != "" {
 		req.Header.Set(echo.HeaderAuthorization, fmt.Sprintf("%v %v", testJWTHeaderPrefix, jwt))

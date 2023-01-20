@@ -11,11 +11,13 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-const bearerPrefix = "Bearer "
+const (
+	bearerPrefix = "Bearer "
+)
 
 var app *firebase.App
 var client *auth.Client
-var firebaseInitilized = false
+var firebaseInitialized = false
 
 type AuthMiddleware struct {
 	authClient AuthClient
@@ -28,7 +30,7 @@ type AuthClient interface {
 
 // DefaultAuthMiddleware returns the auth middleware with a firebase auth client initialized from env vars.
 func DefaultAuthMiddleware() *AuthMiddleware {
-	if !firebaseInitilized {
+	if !firebaseInitialized {
 		initFirebase()
 	}
 	return NewAuthMiddleware(context.Background(), client)
@@ -42,7 +44,7 @@ func NewAuthMiddleware(ctx context.Context, authClient AuthClient) *AuthMiddlewa
 	}
 }
 
-// AllowAnonymous will let pass all petitions trying to find a JWT in headers and loging
+// AllowAnonymous will let pass all petitions trying to find a JWT in headers and log
 // in the user if the JWT is found.
 func (a *AuthMiddleware) AllowAnonymous() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -53,8 +55,16 @@ func (a *AuthMiddleware) AllowAnonymous() echo.MiddlewareFunc {
 	}
 }
 
-// LoggedUsers searchs for a valid JWT and logs in the founded user. If no JWT is found,
-// it returns a 401 unauthorized standar error, stopping the request.
+// ParseJWT tries to find the JWT in auth header and parse it, letting the parsed jwt token
+// in both in context and in the X-Logged-User-ID headers.
+// Its a shortcut of AllowAnonymous method, with a better name to apply as a top level middleware.
+// Useful to have user information in middlewares before the "per path" middlewares.
+func (a *AuthMiddleware) ParseJWT() echo.MiddlewareFunc {
+	return a.AllowAnonymous()
+}
+
+// LoggedUsers search for a valid JWT and logs in the founded user. If no JWT is found,
+// it returns a 401 unauthorized standard error, stopping the request.
 func (a *AuthMiddleware) LoggedUser() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -70,19 +80,28 @@ func (a *AuthMiddleware) LoggedUser() echo.MiddlewareFunc {
 }
 
 // login extract the JWT from Authorization header and verify the JWT with firebase credentials.
+// It sets the extracted token in the context's field "jwt" and in the "X-Logged-User-ID" request & response headers.
+// It first tries to find if the user is already logged (for example, you use the ParseJWT method in a
+// general, top level middleware, and the WithRol method in a single endpoint)
 func (a *AuthMiddleware) login(c echo.Context) (*auth.Token, error) {
+	if userIsAlreadyLogged(c) {
+		return GetIDToken(c)
+	}
 	jwt, err := getJWT(c)
 	if err != nil {
 		return nil, err
 	}
 	idToken, err := a.authClient.VerifyIDToken(a.ctx, jwt)
-	if err == nil {
-		setIDToken(c, idToken)
+	if err != nil {
+		return idToken, err
 	}
+
+	setIDToken(c, idToken)
+	setUserIDHeader(c, idToken.UID)
 	return idToken, err
 }
 
-// WithRol searchs for a valid JWT with the desired rol as a boolean true key in the token Claims
+// WithRol searches for a valid JWT with the desired rol as a boolean true key in the token Claims
 // and logs in the founded user.
 // If no JWT with the rol is found, it returns a 401 or 403 standard error, stopping the request.
 func (a *AuthMiddleware) WithRol(rol string) echo.MiddlewareFunc {
@@ -107,7 +126,7 @@ func (a *AuthMiddleware) WithRol(rol string) echo.MiddlewareFunc {
 	}
 }
 
-// WhitAny searchs for a valid JWT with at least one of the desired roles as a boolean true
+// WhitAny searches for a valid JWT with at least one of the desired roles as a boolean true
 // key in the token Claims and logs in the founded user.
 // If no JWT with one desired rol is found, it returns a 401 or 403 standard error, stopping the request.
 func (a *AuthMiddleware) WithAny(roles []string) echo.MiddlewareFunc {

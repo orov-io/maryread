@@ -15,5 +15,12 @@
 		},
 		"go.coverOnSingleTest": true,
 		"go.testEnvFile": "${workspaceFolder}/testing.env",
+		"cSpell.words": [
+			"gommon",
+			"labstack",
+			"middlewares",
+			"stretchr",
+			"Stringlify"
+		],
 	}
 }

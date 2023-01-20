@@ -5,19 +5,20 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
-	"github.com/rs/zerolog"
+	"github.com/labstack/gommon/log"
 	"github.com/stretchr/testify/assert"
 )
 
 const bodyDumpTestPath = "/test"
 const bodyDumpDefaultResponseKey = "message"
 const bodyDumpDefaultResponse = "test"
-const bodyDumpDefautlRequestMessage = "Truman"
+const bodyDumpDefaultRequestMessage = "Truman"
 
-const bodyDumpLogLevel = "debug"
+const testBodyDumpLogLevel = "-"
 
 type bodyDumpLog struct {
 	Level        string
@@ -26,6 +27,7 @@ type bodyDumpLog struct {
 	ResponseBody string
 	Time         string
 	Message      string
+	Prefix       string
 }
 
 type defaultBodyDumpResponse struct {
@@ -34,7 +36,7 @@ type defaultBodyDumpResponse struct {
 
 func TestBodyDumpOnHeaderDefaultResponse(t *testing.T) {
 	e := echo.New()
-	e.Use(DefaultLogger(zerolog.DebugLevel))
+	e.Use(ContextLogger(e.Logger, uint8(log.DEBUG)))
 	e.Use(BodyDumpOnHeader())
 
 	handler, buffer := getTestBodyDumpHandler(t, nil)
@@ -47,22 +49,28 @@ func TestBodyDumpOnHeaderDefaultResponse(t *testing.T) {
 
 	e.ServeHTTP(rec, req)
 
-	var log bodyDumpLog
-	json.Unmarshal(buffer.Bytes(), &log)
+	var requestDump bodyDumpLog
+	var responseDump bodyDumpLog
+	rawBodyDump := buffer.Bytes()
+	sliceBodyDump := strings.Split(string(rawBodyDump), "\n")
+	assert.Len(t, sliceBodyDump, 3)
 
-	var responseBody defaultBodyDumpResponse
-	json.Unmarshal([]byte(log.ResponseBody), &responseBody)
+	json.Unmarshal([]byte(sliceBodyDump[0]), &requestDump)
+	json.Unmarshal([]byte(sliceBodyDump[1]), &responseDump)
 
-	assert.Equal(t, bodyDumpLogLevel, log.Level)
-	assert.Empty(t, log.RequestID)
-	assert.Empty(t, log.RequestBody)
-	assert.NotEmpty(t, log.ResponseBody)
-	assert.Equal(t, bodyDumpDefaultResponse, responseBody.Message)
+	assert.Equal(t, "X-Body-Dump/response", responseDump.Prefix)
+	assert.Equal(t, "X-Body-Dump/request", requestDump.Prefix)
+
+	assert.Empty(t, requestDump.Message)
+	assert.NotEmpty(t, responseDump.Message)
+
+	assert.Equal(t, testBodyDumpLogLevel, requestDump.Level)
+	assert.Equal(t, testBodyDumpLogLevel, responseDump.Level)
 }
 
 func TestBodyDumpNoHeader(t *testing.T) {
 	e := echo.New()
-	e.Use(DefaultLogger(zerolog.DebugLevel))
+	e.Use(ContextLogger(e.Logger, uint8(log.DEBUG)))
 	e.Use(BodyDumpOnHeader())
 
 	handler, buffer := getTestBodyDumpHandler(t, nil)
@@ -86,7 +94,7 @@ func TestBodyDumpNoHeader(t *testing.T) {
 
 func TestBodyDumpOnHeaderDefaultResponseWhitRequestBody(t *testing.T) {
 	e := echo.New()
-	e.Use(DefaultLogger(zerolog.DebugLevel))
+	e.Use(ContextLogger(e.Logger, uint8(log.DEBUG)))
 	e.Use(BodyDumpOnHeader())
 
 	handler, buffer := getTestBodyDumpHandler(t, nil)
@@ -99,35 +107,35 @@ func TestBodyDumpOnHeaderDefaultResponseWhitRequestBody(t *testing.T) {
 
 	e.ServeHTTP(rec, req)
 
-	var log bodyDumpLog
-	json.Unmarshal(buffer.Bytes(), &log)
+	var requestDump bodyDumpLog
+	var responseDump bodyDumpLog
+	rawBodyDump := buffer.Bytes()
+	sliceBodyDump := strings.Split(string(rawBodyDump), "\n")
+	assert.Len(t, sliceBodyDump, 3)
 
-	var responseBody defaultBodyDumpResponse
-	json.Unmarshal([]byte(log.ResponseBody), &responseBody)
+	json.Unmarshal([]byte(sliceBodyDump[0]), &requestDump)
+	json.Unmarshal([]byte(sliceBodyDump[1]), &responseDump)
 
-	var requestBody defaultBodyDumpResponse
-	json.Unmarshal([]byte(log.RequestBody), &requestBody)
+	assert.Equal(t, "X-Body-Dump/response", responseDump.Prefix)
+	assert.Equal(t, "X-Body-Dump/request", requestDump.Prefix)
 
-	assert.Equal(t, bodyDumpLogLevel, log.Level)
-	assert.Empty(t, log.RequestID)
-	assert.NotEmpty(t, log.RequestBody)
-	assert.Equal(t, bodyDumpDefautlRequestMessage, requestBody.Message)
-	assert.NotEmpty(t, log.ResponseBody)
-	assert.Equal(t, bodyDumpDefaultResponse, responseBody.Message)
+	assert.NotEmpty(t, requestDump.Message)
+	assert.NotEmpty(t, responseDump.Message)
+
+	assert.Equal(t, testBodyDumpLogLevel, requestDump.Level)
+	assert.Equal(t, testBodyDumpLogLevel, responseDump.Level)
 }
 
 func getDefaultRequestBody() *bytes.Buffer {
 	var buff bytes.Buffer
-	json.NewEncoder(&buff).Encode(defaultBodyDumpResponse{Message: bodyDumpDefautlRequestMessage})
+	json.NewEncoder(&buff).Encode(defaultBodyDumpResponse{Message: bodyDumpDefaultRequestMessage})
 	return &buff
 }
 
 func getTestBodyDumpHandler(t *testing.T, resp *echo.Map) (echo.HandlerFunc, *bytes.Buffer) {
 	buffer := new(bytes.Buffer)
 	return func(c echo.Context) error {
-		logger := GetLogger(c)
-		recorderLogger := logger.Output(buffer)
-		SetLogger(c, recorderLogger)
+		c.Logger().SetOutput(buffer)
 		if resp == nil {
 			resp = &echo.Map{bodyDumpDefaultResponseKey: bodyDumpDefaultResponse}
 		}
